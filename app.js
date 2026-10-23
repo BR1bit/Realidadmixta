@@ -9,7 +9,10 @@ const sliders = {
     goalTolerance: document.getElementById('goal-tolerance'),
     sMin: document.getElementById('s-min'),
     vMin: document.getElementById('v-min'),
-    boxOpacity: document.getElementById('box-opacity')
+    boxOpacity: document.getElementById('box-opacity'),
+    paddleRestitution: document.getElementById('paddle-restitution'),
+    paddleSpeed: document.getElementById('paddle-speed'),
+    paddleStability: document.getElementById('paddle-stability')
 };
 
 const labels = {
@@ -20,7 +23,10 @@ const labels = {
     goalTolerance: document.getElementById('goal-tolerance-val'),
     sMin: document.getElementById('s-min-val'),
     vMin: document.getElementById('v-min-val'),
-    boxOpacity: document.getElementById('box-opacity-val')
+    boxOpacity: document.getElementById('box-opacity-val'),
+    paddleRestitution: document.getElementById('paddle-restitution-val'),
+    paddleSpeed: document.getElementById('paddle-speed-val'),
+    paddleStability: document.getElementById('paddle-stability-val')
 };
 
 const targetColorPicker = document.getElementById('target-color');
@@ -126,7 +132,7 @@ function showResultOverlay(message) {
 
 function hideResultOverlay() {
     if (!resultOverlay) return;
-    resultOverlay.classList.remove('show');
+    resultOverlay.classList.remove('show', 'ended');
 }
 
 function showPhase2Warning() {
@@ -318,7 +324,7 @@ function endMatch() {
 
     }
 
-    resultOverlay.classList.add("show");
+    resultOverlay.classList.add("show", "ended");
     resultText.animate(
     [
         { transform: "scale(0.5)", opacity: 0 },
@@ -496,6 +502,79 @@ Object.keys(sliders).forEach(key => {
     });
 });
 
+// Persist settings in localStorage
+const SETTINGS_KEY = 'realtimeBlockSettings';
+const camFlipCheckbox = document.getElementById('cam-flip');
+const showBasketCheckbox = document.getElementById('show-basket');
+const showPaddleCheckbox = document.getElementById('show-paddle');
+let savedSettings = {};
+
+function loadSettings() {
+    try {
+        savedSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    } catch (e) {
+        savedSettings = {};
+    }
+
+    Object.keys(sliders).forEach(key => {
+        if (savedSettings[key] === undefined) return;
+        sliders[key].value = savedSettings[key];
+        labels[key].textContent = sliders[key].value;
+    });
+    if (savedSettings.targetColor) targetColorPicker.value = savedSettings.targetColor;
+    if (savedSettings.goalColor) goalColorPicker.value = savedSettings.goalColor;
+    if (savedSettings.camFlip !== undefined) camFlipCheckbox.checked = savedSettings.camFlip;
+    if (savedSettings.showBasket !== undefined) showBasketCheckbox.checked = savedSettings.showBasket;
+    if (savedSettings.showPaddle !== undefined) showPaddleCheckbox.checked = savedSettings.showPaddle;
+    if (savedSettings.webcamBgHidden) videoBgContainer.style.display = 'none';
+}
+
+function saveSettings() {
+    Object.keys(sliders).forEach(key => {
+        savedSettings[key] = sliders[key].value;
+    });
+    savedSettings.targetColor = targetColorPicker.value;
+    savedSettings.goalColor = goalColorPicker.value;
+    savedSettings.camFlip = camFlipCheckbox.checked;
+    savedSettings.showBasket = showBasketCheckbox.checked;
+    savedSettings.showPaddle = showPaddleCheckbox.checked;
+    savedSettings.webcamBgHidden = videoBgContainer.style.display === 'none';
+    if (cameraSelect.value) savedSettings.cameraId = cameraSelect.value;
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(savedSettings));
+    } catch (e) {}
+}
+
+// Select the saved camera once the device list is populated
+function restoreCameraSelection() {
+    const id = savedSettings.cameraId;
+    if (id && [...cameraSelect.options].some(o => o.value === id)) {
+        cameraSelect.value = id;
+    }
+}
+
+loadSettings();
+
+[...Object.values(sliders), targetColorPicker, goalColorPicker, camFlipCheckbox, showBasketCheckbox, showPaddleCheckbox, cameraSelect].forEach(el => {
+    el.addEventListener('change', saveSettings);
+    el.addEventListener('input', saveSettings);
+});
+
+document.getElementById('reset-settings-btn').addEventListener('click', () => {
+    if (!confirm('¿Restablecer toda la configuración a los valores por defecto?')) return;
+    try {
+        localStorage.removeItem(SETTINGS_KEY);
+    } catch (e) {}
+    location.reload();
+});
+
+// Restart button shown on the end-of-match overlay
+document.getElementById('restart-match-btn').addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    resetMatch();
+    startMatch();
+});
+
 window.addEventListener('keydown', (e) => {
 
     const key = e.key.toLowerCase();
@@ -530,13 +609,14 @@ window.addEventListener('keydown', (e) => {
 
 toggleBgBtn.addEventListener('click', () => {
     videoBgContainer.style.display = videoBgContainer.style.display === 'none' ? 'block' : 'none';
+    saveSettings();
 });
 
 // Wait for OpenCV.js
 let cvReady = false;
 window.onOpenCvReady = function () {
     cvReady = true;
-    statusMsg.textContent = "OpenCV Ready! Waiting to start...";
+    statusMsg.textContent = "¡OpenCV listo! Esperando para iniciar...";
     console.log('OpenCV.js is ready.');
 };
 
@@ -777,12 +857,12 @@ let procRows = 480;
 startBtn.addEventListener('click', async () => {
     if (webcamActive) return;
     if (!cvReady) {
-        alert("Please wait for OpenCV to load.");
+        alert("Esperá a que termine de cargar OpenCV.");
         return;
     }
 
     try {
-        statusMsg.textContent = "Requesting webcam access...";
+        statusMsg.textContent = "Pidiendo acceso a la cámara...";
         let constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 } } };
 
         if (cameraSelect.value) {
@@ -813,13 +893,14 @@ startBtn.addEventListener('click', async () => {
             videoDevices.forEach((device, index) => {
                 const option = document.createElement('option');
                 option.value = device.deviceId;
-                option.text = device.label || `Camera ${index + 1}`;
+                option.text = device.label || `Cámara ${index + 1}`;
                 if (stream.getVideoTracks()[0].label === device.label) {
                     option.selected = true; // highlight currently used
                 }
                 cameraSelect.appendChild(option);
             });
         }
+        saveSettings();
 
         video.onloadedmetadata = () => {
             // Keep aspect ratio for processing
@@ -836,11 +917,11 @@ startBtn.addEventListener('click', async () => {
 
             if (!webcamActive) {
                 webcamActive = true;
-                statusMsg.textContent = "Webcam active. Reading pink regions...";
+                statusMsg.textContent = "Cámara activa. Detectando colores...";
                 startMatch();
                 startProcessingLoop();
                 startSpawner();
-                startBtn.textContent = "Running Simulation";
+                startBtn.textContent = "Juego en marcha";
                 startBtn.style.opacity = 0.5;
             }
         };
@@ -860,7 +941,7 @@ cameraSelect.addEventListener('change', () => {
         }
         // simulate click to restart with new settings
         webcamActive = false;
-        startBtn.textContent = 'Restarting...';
+        startBtn.textContent = 'Reiniciando...';
         startBtn.click();
     }
 });
@@ -875,9 +956,10 @@ cameraSelect.addEventListener('focus', async () => {
             videoDevices.forEach((device, index) => {
                 const option = document.createElement('option');
                 option.value = device.deviceId;
-                option.text = device.label || `Camera ${index + 1}`;
+                option.text = device.label || `Cámara ${index + 1}`;
                 cameraSelect.appendChild(option);
             });
+            restoreCameraSelection();
         } catch (e) {
             console.error("Could not enumerate devices ahead of time", e);
         }
@@ -894,9 +976,10 @@ window.addEventListener('DOMContentLoaded', async () => {
             videoDevices.forEach((device, index) => {
                 const option = document.createElement('option');
                 option.value = device.deviceId;
-                option.text = device.label || `Camera ${index + 1}`;
+                option.text = device.label || `Cámara ${index + 1}`;
                 cameraSelect.appendChild(option);
             });
+            restoreCameraSelection();
         }
     } catch(e) {}
 });
@@ -913,15 +996,13 @@ const basketConfig = {
     widthClampMax: 320,
     aspectRatio: 0.6, // height = width * aspectRatio
     wallThickness: 28,
-    // Minimal smoothing only to reduce jitter without lag.
-    posSmoothing: 1.0,
-    angleSmoothing: 1.0,
     // Base local X axis is basket base direction (parallel to long side).
     orientationOffsetDeg: 0,
-    maxLinearSpeedPxPerSec: 760,
     maxAngularSpeedRadPerSec: 3.2,
     longSideHysteresisRatio: 1.08,
-    lostTargetTimeoutMs: 350
+    lostTargetTimeoutMs: 500,
+    // Among blobs at least this fraction of the largest one, prefer the closest to the last position
+    continuityAreaRatio: 0.35
 };
 const DEFAULT_COLLISION_MASK = 0xFFFFFFFF;
 const basketControllers = [1, 2].map((playerId) => ({
@@ -930,6 +1011,7 @@ const basketControllers = [1, 2].map((playerId) => ({
     pose: { initialized: false, x: 0, y: 0, angle: 0, width: 0, height: 0 },
     target: { hasTarget: false, x: 0, y: 0, angle: 0 },
     lastSeenMs: 0,
+    filters: null,
     longSideState: { initialized: false, useWidthAxis: true }
 }));
 
@@ -938,11 +1020,6 @@ function normalizeAngleRad(angle) {
     while (a > Math.PI) a -= Math.PI * 2;
     while (a < -Math.PI) a += Math.PI * 2;
     return a;
-}
-
-function smoothAngle(current, target, alpha) {
-    const delta = normalizeAngleRad(target - current);
-    return normalizeAngleRad(current + delta * alpha);
 }
 
 function pickNearestEquivalentAngle(baseAngle, referenceAngle) {
@@ -1027,7 +1104,7 @@ function createTrackingBasket(innerWidth, innerHeight, alpha, playerId) {
         label: `tracking-basket-p${playerId}`,
         isStatic: true,
         friction: 0.05,
-        restitution: 0.05,
+        restitution: parseFloat(sliders.paddleRestitution.value),
         parts: [bottom, left, right]
     });
 
@@ -1044,7 +1121,63 @@ function setBasketActive(controller, active) {
     });
 }
 
-function updateBasketTarget(controller, cx, cy, angle, alpha, nowMs) {
+// One Euro filter: smooths jitter when the paddle is still, follows quickly when it moves fast
+function createOneEuroFilter() {
+    return { value: null, deriv: 0, lastMs: 0 };
+}
+
+function oneEuroAlpha(cutoffHz, dtSec) {
+    const tau = 1 / (2 * Math.PI * cutoffHz);
+    return 1 / (1 + tau / dtSec);
+}
+
+function oneEuroFilter(filter, value, nowMs, minCutoff, beta) {
+    if (filter.value === null) {
+        filter.value = value;
+        filter.deriv = 0;
+        filter.lastMs = nowMs;
+        return value;
+    }
+    const dtSec = Math.max(0.001, (nowMs - filter.lastMs) / 1000);
+    filter.lastMs = nowMs;
+    const rawDeriv = (value - filter.value) / dtSec;
+    filter.deriv += (rawDeriv - filter.deriv) * oneEuroAlpha(1.0, dtSec);
+    const cutoff = minCutoff + beta * Math.abs(filter.deriv);
+    filter.value += (value - filter.value) * oneEuroAlpha(cutoff, dtSec);
+    return filter.value;
+}
+
+// Stability slider 0..10 -> min cutoff from 30Hz (raw) down to 0.5Hz (very smooth)
+function getPaddleMinCutoff() {
+    const stability = parseInt(sliders.paddleStability.value) / 10;
+    return 30 * Math.pow(0.5 / 30, stability);
+}
+
+function smoothDetection(controller, cx, cy, angle, nowMs) {
+    if (!controller.filters || !controller.target.hasTarget) {
+        controller.filters = {
+            x: createOneEuroFilter(),
+            y: createOneEuroFilter(),
+            angle: createOneEuroFilter(),
+            unwrappedAngle: angle,
+            lastRawAngle: angle
+        };
+    }
+    const f = controller.filters;
+    // Unwrap the angle so the filter never averages across the -PI/PI seam
+    f.unwrappedAngle += normalizeAngleRad(angle - f.lastRawAngle);
+    f.lastRawAngle = angle;
+
+    const minCutoff = getPaddleMinCutoff();
+    return {
+        x: oneEuroFilter(f.x, cx, nowMs, minCutoff, 0.01),
+        y: oneEuroFilter(f.y, cy, nowMs, minCutoff, 0.01),
+        angle: normalizeAngleRad(oneEuroFilter(f.angle, f.unwrappedAngle, nowMs, minCutoff, 0.5))
+    };
+}
+
+function updateBasketTarget(controller, rawCx, rawCy, rawAngle, alpha, nowMs) {
+    const { x: cx, y: cy, angle } = smoothDetection(controller, rawCx, rawCy, rawAngle, nowMs);
     if (!controller.pose.initialized) {
         controller.pose.x = cx;
         controller.pose.y = cy;
@@ -1055,9 +1188,9 @@ function updateBasketTarget(controller, cx, cy, angle, alpha, nowMs) {
         controller.target.angle = angle;
         controller.target.hasTarget = true;
     } else {
-        controller.target.x += (cx - controller.target.x) * basketConfig.posSmoothing;
-        controller.target.y += (cy - controller.target.y) * basketConfig.posSmoothing;
-        controller.target.angle = smoothAngle(controller.target.angle, angle, basketConfig.angleSmoothing);
+        controller.target.x = cx;
+        controller.target.y = cy;
+        controller.target.angle = angle;
         controller.target.hasTarget = true;
     }
 
@@ -1069,8 +1202,11 @@ function updateBasketTarget(controller, cx, cy, angle, alpha, nowMs) {
         controller.body = createTrackingBasket(initialWidth, initialHeight, alpha, controller.playerId);
     }
 
-    const fillStyle = `rgba(255, 255, 255, ${alpha * 0.22})`;
-    const strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    // Hiding the paddle only affects drawing; collisions keep working
+    const drawAlpha = showPaddleCheckbox.checked ? alpha : 0;
+    const fillStyle = `rgba(255, 255, 255, ${drawAlpha * 0.22})`;
+    const strokeStyle = `rgba(255, 255, 255, ${drawAlpha})`;
+    controller.body.restitution = parseFloat(sliders.paddleRestitution.value);
     controller.body.parts.slice(1).forEach((part) => {
         part.render.fillStyle = fillStyle;
         part.render.strokeStyle = strokeStyle;
@@ -1088,7 +1224,7 @@ function driveBasketPhysics(controller, dtMs, nowMs) {
     if (!controller.target.hasTarget) return;
 
     const dtSec = Math.max(0.001, dtMs / 1000);
-    const maxPosStep = basketConfig.maxLinearSpeedPxPerSec * dtSec;
+    const maxPosStep = parseFloat(sliders.paddleSpeed.value) * dtSec;
     let nextPos = moveTowardsPoint(controller.body.position, controller.target, maxPosStep);
 
     // Keep exactly one basket per side and never allow crossing mid divider.
@@ -1114,30 +1250,35 @@ function driveBasketPhysics(controller, dtMs, nowMs) {
 }
 
 function assignDetectionsToControllers(detections) {
-    const assignments = new Array(basketControllers.length).fill(null);
-    if (detections.length === 0) return assignments;
-
     // Player 1 controls only left side, Player 2 controls only right side.
     const dividerX = window.innerWidth / 2;
-    const leftDetections = detections.filter((d) => d.cx < dividerX);
-    const rightDetections = detections.filter((d) => d.cx >= dividerX);
+    return basketControllers.map((controller) => {
+        const side = detections.filter((d) => controller.playerId === 1 ? d.cx < dividerX : d.cx >= dividerX);
+        if (side.length === 0) return null;
 
-    if (leftDetections.length > 0) {
-        leftDetections.sort((a, b) => b.area - a.area);
-        assignments[0] = leftDetections[0];
-    }
-    if (rightDetections.length > 0) {
-        rightDetections.sort((a, b) => b.area - a.area);
-        assignments[1] = rightDetections[0];
-    }
-
-    return assignments;
+        const maxArea = Math.max(...side.map((d) => d.area));
+        const pool = side.filter((d) => d.area >= maxArea * basketConfig.continuityAreaRatio);
+        if (!controller.target.hasTarget) {
+            return pool.reduce((best, d) => (d.area > best.area ? d : best));
+        }
+        // Stick to the blob nearest to where the paddle was, so it doesn't jump to other objects
+        const dist = (d) => Math.hypot(d.cx - controller.target.x, d.cy - controller.target.y);
+        return pool.reduce((best, d) => (dist(d) < dist(best) ? d : best));
+    });
 }
 
 function hexToOpencvHsv(hex) {
-    let r = parseInt(hex.substring(1,3), 16) / 255;
-    let g = parseInt(hex.substring(3,5), 16) / 255;
-    let b = parseInt(hex.substring(5,7), 16) / 255;
+    return rgbToOpencvHsv(
+        parseInt(hex.substring(1,3), 16),
+        parseInt(hex.substring(3,5), 16),
+        parseInt(hex.substring(5,7), 16)
+    );
+}
+
+function rgbToOpencvHsv(r255, g255, b255) {
+    let r = r255 / 255;
+    let g = g255 / 255;
+    let b = b255 / 255;
     let max = Math.max(r, g, b), min = Math.min(r, g, b);
     let h, s, v = max;
     let d = max - min;
@@ -1196,6 +1337,141 @@ function createMaskFromColor(hsv, colorHex, tolerance, sMin, vMin) {
     return resultMask;
 }
 
+const showMaskCheckbox = document.getElementById('show-mask');
+const maskPreviewCanvas = document.getElementById('mask-preview');
+showMaskCheckbox.addEventListener('change', () => {
+    maskPreviewCanvas.style.display = showMaskCheckbox.checked ? 'block' : 'none';
+});
+
+// Paddles in white, goal zones in red
+function drawMaskPreview(paddleMask, goalMaskMat) {
+    if (!showMaskCheckbox.checked) return;
+    const red = new cv.Mat();
+    const channels = new cv.MatVector();
+    const preview = new cv.Mat();
+    cv.max(paddleMask, goalMaskMat, red);
+    channels.push_back(red);
+    channels.push_back(paddleMask);
+    channels.push_back(paddleMask);
+    cv.merge(channels, preview);
+    cv.imshow(maskPreviewCanvas, preview);
+    red.delete();
+    channels.delete();
+    preview.delete();
+}
+
+// Click-to-calibrate: sample the camera around the clicked point and derive color + thresholds
+const calibHint = document.getElementById('calib-hint');
+let calibrationTarget = null;
+
+function percentile(sortedValues, p) {
+    const idx = Math.min(sortedValues.length - 1, Math.max(0, Math.round((sortedValues.length - 1) * p)));
+    return sortedValues[idx];
+}
+
+function sampleColorAt(clientX, clientY) {
+    const px = Math.round(clientX * procCols / window.innerWidth);
+    const py = Math.round(clientY * procRows / window.innerHeight);
+    const r = 5;
+    const x0 = clamp(px - r, 0, procCols - 1);
+    const y0 = clamp(py - r, 0, procRows - 1);
+    const w = Math.min(2 * r + 1, procCols - x0);
+    const h = Math.min(2 * r + 1, procRows - y0);
+    const data = ctx.getImageData(x0, y0, w, h).data;
+
+    const reds = [], greens = [], blues = [], sats = [], vals = [], hues = [];
+    for (let i = 0; i < data.length; i += 4) {
+        reds.push(data[i]);
+        greens.push(data[i + 1]);
+        blues.push(data[i + 2]);
+        const hsv = rgbToOpencvHsv(data[i], data[i + 1], data[i + 2]);
+        hues.push(hsv.h);
+        sats.push(hsv.s);
+        vals.push(hsv.v);
+    }
+    [reds, greens, blues, sats, vals].forEach((arr) => arr.sort((a, b) => a - b));
+
+    const toHex = (v) => v.toString(16).padStart(2, '0');
+    const hex = `#${toHex(percentile(reds, 0.5))}${toHex(percentile(greens, 0.5))}${toHex(percentile(blues, 0.5))}`;
+    const centerHsv = hexToOpencvHsv(hex);
+    const centerHue = centerHsv.h;
+    // Hue is circular (0..179 in OpenCV), measure spread around the median color
+    const hueDiffs = hues
+        .map((hue) => {
+            const d = Math.abs(hue - centerHue) % 180;
+            return Math.min(d, 180 - d);
+        })
+        .sort((a, b) => a - b);
+
+    return {
+        hex,
+        hueSpread: percentile(hueDiffs, 0.9),
+        // Use the median color itself: per-pixel saturation is unreliable on dark, noisy pixels
+        sMedian: centerHsv.s,
+        vMedian: centerHsv.v,
+        sLow: percentile(sats, 0.1),
+        vLow: percentile(vals, 0.1)
+    };
+}
+
+function setSliderValue(key, value) {
+    sliders[key].value = value;
+    labels[key].textContent = sliders[key].value;
+}
+
+function startCalibration(target) {
+    if (!webcamActive) {
+        alert('Primero iniciá la cámara.');
+        return;
+    }
+    calibrationTarget = target;
+    document.body.classList.add('calibrating');
+    calibHint.textContent = target === 'paddle'
+        ? 'Hacé clic sobre una paleta (Esc para cancelar)'
+        : 'Hacé clic sobre una canasta (Esc para cancelar)';
+    calibHint.style.display = 'block';
+}
+
+function stopCalibration() {
+    calibrationTarget = null;
+    document.body.classList.remove('calibrating');
+    calibHint.style.display = 'none';
+}
+
+document.getElementById('calib-paddle-btn').addEventListener('click', () => startCalibration('paddle'));
+document.getElementById('calib-goal-btn').addEventListener('click', () => startCalibration('goal'));
+
+window.addEventListener('click', (e) => {
+    if (!calibrationTarget) return;
+    if (uiPanel.contains(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sample = sampleColorAt(e.clientX, e.clientY);
+    // Gray/white/black have no reliable hue: accepting them would mark the whole scene as paddle
+    if (sample.sMedian < 60 || sample.vMedian < 60) {
+        calibHint.textContent = 'Ese punto no tiene un color definido. Probá de nuevo sobre el objeto (Esc para cancelar)';
+        return;
+    }
+    const tolerance = clamp(Math.round(sample.hueSpread + 8), 10, 40);
+    if (calibrationTarget === 'paddle') {
+        targetColorPicker.value = sample.hex;
+        setSliderValue('colorTolerance', tolerance);
+        // Leave margin below the darkest/least saturated part of the sample for shadows
+        setSliderValue('sMin', clamp(sample.sLow - 50, 30, 150));
+        setSliderValue('vMin', clamp(sample.vLow - 60, 30, 150));
+    } else {
+        goalColorPicker.value = sample.hex;
+        setSliderValue('goalTolerance', tolerance);
+    }
+    saveSettings();
+    stopCalibration();
+}, true);
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && calibrationTarget) stopCalibration();
+});
+
 function startProcessingLoop() {
     // OpenCV Mats
     let src = new cv.Mat(procRows, procCols, cv.CV_8UC4);
@@ -1203,6 +1479,9 @@ function startProcessingLoop() {
     let mask = new cv.Mat();
     let goalMask = new cv.Mat();
     let hierarchy = new cv.Mat();
+    const blurSize = new cv.Size(5, 5);
+    const openKernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
+    const closeKernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(11, 11));
 
     function processFrame() {
         if (!webcamActive) return;
@@ -1275,6 +1554,8 @@ function startProcessingLoop() {
 
         // Convert to HSV
         cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+        // Blur first so camera noise doesn't punch holes in the color mask
+        cv.GaussianBlur(hsv, hsv, blurSize, 0);
         cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
 
         // Get threshold values
@@ -1296,13 +1577,13 @@ function startProcessingLoop() {
         mask = targetMask;
         goalMask = newGoalMask;
 
-        // Clean up noise
-        let M = cv.Mat.ones(5, 5, cv.CV_8U);
-        cv.erode(mask, mask, M, new cv.Point(-1, -1), 1);
-        cv.dilate(mask, mask, M, new cv.Point(-1, -1), 1);
-        cv.erode(goalMask, goalMask, M, new cv.Point(-1, -1), 1);
-        cv.dilate(goalMask, goalMask, M, new cv.Point(-1, -1), 1);
-        M.delete();
+        // Clean up noise: open removes specks, close fills holes and rejoins a paddle split by a hand or glare
+        cv.morphologyEx(mask, mask, cv.MORPH_OPEN, openKernel);
+        cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, closeKernel);
+        cv.morphologyEx(goalMask, goalMask, cv.MORPH_OPEN, openKernel);
+        cv.morphologyEx(goalMask, goalMask, cv.MORPH_CLOSE, closeKernel);
+
+        drawMaskPreview(mask, goalMask);
 
         // Find collision contours
         let contours = new cv.MatVector();
@@ -1333,11 +1614,7 @@ function startProcessingLoop() {
             cnt.delete();
         }
 
-        const detections = candidates
-            .sort((a, b) => b.area - a.area)
-            .slice(0, 2);
-
-        const assignments = assignDetectionsToControllers(detections);
+        const assignments = assignDetectionsToControllers(candidates);
         const nowMs = Date.now();
         basketControllers.forEach((controller, idx) => {
             const det = assignments[idx];
@@ -1393,6 +1670,8 @@ function startProcessingLoop() {
                 angle: goal.angle,
                 label: `goal-zone-${zoneNumber}`,
                 render: {
+                    // Hiding the goal zone only affects drawing; scoring keeps working
+                    visible: showBasketCheckbox.checked,
                     fillStyle: zoneNumber === 1 ? 'rgba(255, 0, 0, 0.25)' : 'rgba(0, 128, 255, 0.25)',
                     strokeStyle: zoneNumber === 1 ? 'rgba(255, 0, 0, 0.85)' : 'rgba(0, 128, 255, 0.85)',
                     lineWidth: 3
@@ -1408,7 +1687,7 @@ function startProcessingLoop() {
         }
         
         goalBodies = newGoalBodies;
-        statusMsg.textContent = `Webcam active. Canastas: ${webcamBodies.length}/2 | Goal zones: ${goalBodies.length}`;
+        statusMsg.textContent = `Cámara activa. Paletas: ${webcamBodies.length}/2 | Canastas: ${goalBodies.length}`;
 
         contours.delete();
         goalContours.delete();

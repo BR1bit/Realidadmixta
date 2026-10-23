@@ -1,4 +1,4 @@
-El juego consiste en recoger las pelotas azules en una canasta, para posteriormente volcarlas en la zona de puntaje, el jugador que consiga más puntos gana.
+El juego consiste en llevar las pelotas azules con la paleta hasta la canasta, el jugador que consiga más puntos gana.
 
 La duración por partida es de 90 segundos, consta de dos fases, la primera es fácil solamente aparecen pelotas azules que suman +1, en la segunda fase ya aparecen pelotas rojas aleatorias que restan -1.
 
@@ -15,11 +15,16 @@ Abrir http://localhost:8080/ en tu navegador
 
 Pasos a seguir
 
-1- En el panel de la derecha bajar hasta donde dice "Start Webcam"
+1- En el panel de la derecha bajar hasta donde dice "Iniciar cámara"
 
-2- Ajustar en el panel el "Goal Color" que vendría a ser en donde deben caer las pelotas. 
+2- Tocar "Calibrar paleta" y hacer clic sobre una paleta en la imagen de la cámara.
+   Esto ajusta solo el color, la tolerancia, la saturación y el brillo.
 
-3- Ajustar el "Target Color" que vendrían a ser las paletas.
+3- Tocar "Calibrar canasta" y hacer clic sobre una canasta (donde deben caer las pelotas).
+
+   Tip: tildar "Ver detección" para ver qué está detectando la app
+   (blanco = paletas, rojo = canasta). Si se ve ruido, recalibrar o subir
+   "Estabilidad de paletas" en la sección Paletas.
 
 Una vez configurado esto estamos listos para comenzar.
 
@@ -28,3 +33,8 @@ Teclas para usabilidad
 H - Esconde el panel de la derecha.
 R - Resetea el juego y lo deja en pausa.
 T - Comienza el juego.
+
+Al terminar la partida aparece el botón "Jugar de nuevo" para arrancar otra.
+La configuración del panel se guarda sola en el navegador; con "Restablecer configuración" vuelve a los valores por defecto.
+En la sección "Canasta" se puede destildar "Mostrar canasta" para no dibujarla (los puntos siguen contando).
+En la sección "Paletas" se puede destildar "Mostrar paleta (U)" para no dibujar la U (sigue funcionando), y se ajusta el rebote y la velocidad de las paletas de los jugadores.

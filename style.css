@@ -142,6 +142,12 @@ button:active {
     transform: translateY(0);
 }
 
+#reset-settings-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #999;
+}
+
 #clear-balls {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -268,6 +274,27 @@ button:active {
     opacity: 1;
 }
 
+#result-overlay{
+    flex-direction: column;
+    gap: 28px;
+}
+
+#restart-match-btn{
+    display: none;
+    width: auto;
+    padding: 14px 36px;
+    font-size: clamp(18px, 2vw, 26px);
+    font-weight: 700;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    pointer-events: auto;
+}
+
+#result-overlay.ended #restart-match-btn{
+    display: block;
+}
+
 #result-text{
     font-size: clamp(44px, 7vw, 92px);
     font-weight: 800;
@@ -278,4 +305,38 @@ button:active {
     background: rgba(10, 14, 30, 0.75);
     text-shadow: 0 0 16px rgba(255, 255, 255, 0.45);
     box-shadow: 0 0 40px rgba(40, 140, 255, 0.28);
+}
+.calib-btn {
+    padding: 8px;
+    font-size: 0.85rem;
+    background: rgba(0, 210, 255, 0.15);
+    border: 1px solid rgba(0, 210, 255, 0.5);
+}
+
+#mask-preview {
+    display: none;
+    width: 100%;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    background: #000;
+}
+
+#calib-hint {
+    display: none;
+    position: fixed;
+    top: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20000;
+    padding: 12px 22px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(0, 210, 255, 0.7);
+    color: #fff;
+    font-size: 1.05rem;
+    pointer-events: none;
+}
+
+body.calibrating, body.calibrating * {
+    cursor: crosshair !important;
 }

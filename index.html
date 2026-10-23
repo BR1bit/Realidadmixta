@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webcam Ball Drop Sim</title>
+    <title>Juego de Pelotas con Webcam</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -16,81 +16,119 @@
         </div>
         <div id="score-right" class="score-msg">Jugador 2: 0</div>
     </div>
+    <div id="calib-hint"></div>
     <div id="result-overlay">
         <div id="result-text"></div>
+        <button id="restart-match-btn">Jugar de nuevo</button>
     </div>
     <div id="ui-panel">
-        <h2>Physics Controls</h2>
+        <h2>Controles de Física</h2>
         
         <div class="control-group">
-            <label>Spawn Interval (<span id="interval-val">200</span>ms)</label>
+            <label>Intervalo de aparición (<span id="interval-val">200</span> ms)</label>
             <input type="range" id="spawn-interval" min="50" max="2000" value="200">
         </div>
 
 
         <div class="control-group">
-            <label>Spawn X Position (<span id="spawn-x-val">50</span>%)</label>
+            <label>Posición X de aparición (<span id="spawn-x-val">50</span>%)</label>
             <input type="range" id="spawn-x" min="10" max="90" value="50">
         </div>
 
         <div class="control-group">
-            <label>Ball Bounciness (<span id="restitution-val">0.8</span>)</label>
+            <label>Rebote de las pelotas (<span id="restitution-val">0.8</span>)</label>
             <input type="range" id="restitution" min="0" max="1" step="0.1" value="0.8">
         </div>
 
-        <h2>Color Detection</h2>
+        <h2>Detección de Color</h2>
         
         <div class="control-group">
-            <label>Target Color</label>
+            <label>Color de las paletas (jugadores)</label>
             <input type="color" id="target-color" value="#ff1493" style="width:100%; height:40px; cursor:pointer; padding:0; border:none; border-radius:4px;">
-            <label style="margin-top:10px;">Color Tolerance (<span id="color-tolerance-val">20</span>)</label>
+            <label style="margin-top:10px;">Tolerancia de color (<span id="color-tolerance-val">20</span>)</label>
             <input type="range" id="color-tolerance" min="1" max="90" value="20">
+            <button id="calib-paddle-btn" class="calib-btn">🎯 Calibrar paleta (clic sobre ella)</button>
         </div>
 
         <div class="control-group">
-            <label>Saturation Min (<span id="s-min-val">80</span>)</label>
+            <label>Saturación mínima (<span id="s-min-val">80</span>)</label>
             <input type="range" id="s-min" min="0" max="255" value="80">
         </div>
 
         <div class="control-group">
-            <label>Value/Lightness Min (<span id="v-min-val">80</span>)</label>
+            <label>Brillo mínimo (<span id="v-min-val">80</span>)</label>
             <input type="range" id="v-min" min="0" max="255" value="80">
         </div>
 
         <div class="control-group">
-            <label>Box Opacity (<span id="box-opacity-val">100</span>%)</label>
+            <label>Opacidad de los bloques (<span id="box-opacity-val">100</span>%)</label>
             <input type="range" id="box-opacity" min="0" max="100" value="100">
         </div>
+
+        <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="show-mask" style="margin-bottom: 0;">Ver detección (blanco: paletas, rojo: canasta)</label>
+            <input type="checkbox" id="show-mask" style="width: 20px; height: 20px;">
+        </div>
+        <canvas id="mask-preview"></canvas>
         
-        <h2>Goal Zone</h2>
+        <h2>Paletas</h2>
+
+        <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="show-paddle" style="margin-bottom: 0;">Mostrar paleta (U)</label>
+            <input type="checkbox" id="show-paddle" checked style="width: 20px; height: 20px;">
+        </div>
+
+        <div class="control-group">
+            <label>Estabilidad de paletas (<span id="paddle-stability-val">5</span>)</label>
+            <input type="range" id="paddle-stability" min="0" max="10" value="5">
+        </div>
+
+        <div class="control-group">
+            <label>Rebote en paletas (<span id="paddle-restitution-val">0.6</span>)</label>
+            <input type="range" id="paddle-restitution" min="0" max="1" step="0.05" value="0.6">
+        </div>
+
+        <div class="control-group">
+            <label>Velocidad de paletas (<span id="paddle-speed-val">1200</span> px/s)</label>
+            <input type="range" id="paddle-speed" min="400" max="2000" step="100" value="1200">
+        </div>
+
+        <h2>Canasta</h2>
         
         <div class="control-group">
-            <label>Goal Color (e.g. red box)</label>
+            <label>Color de la canasta (ej. caja roja)</label>
             <input type="color" id="goal-color" value="#ff0000" style="width:100%; height:40px; cursor:pointer; padding:0; border:none; border-radius:4px;">
-            <label style="margin-top:10px;">Goal Tolerance (<span id="goal-tolerance-val">20</span>)</label>
+            <label style="margin-top:10px;">Tolerancia de la canasta (<span id="goal-tolerance-val">20</span>)</label>
             <input type="range" id="goal-tolerance" min="1" max="90" value="20">
+            <button id="calib-goal-btn" class="calib-btn">🎯 Calibrar canasta (clic sobre ella)</button>
+        </div>
+
+        <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="show-basket" style="margin-bottom: 0;">Mostrar canasta</label>
+            <input type="checkbox" id="show-basket" checked style="width: 20px; height: 20px;">
         </div>
         
 
         <div class="control-group" style="display: flex; align-items: center; justify-content: space-between;">
-            <label for="cam-flip" style="margin-bottom: 0;">Mirror Camera (Horizontal Flip)</label>
+            <label for="cam-flip" style="margin-bottom: 0;">Espejar cámara (volteo horizontal)</label>
             <input type="checkbox" id="cam-flip" checked style="width: 20px; height: 20px;">
         </div>
         
         <div class="control-group">
-            <label>Camera Input</label>
+            <label>Cámara</label>
             <select id="camera-select" style="width:100%; padding:8px; background:#4a4a4a; color:white; border:none; border-radius:4px; margin-top:5px; font-family:inherit;">
-                <option value="">Default Camera</option>
+                <option value="">Cámara predeterminada</option>
             </select>
         </div>
 
 
-        <button id="start-btn">Start Webcam</button>
-        <button id="toggle-bg-btn">Toggle Webcam BG</button>
-        <button id="clear-balls">Clear Balls</button>
-        <div class="status" id="status-msg">Waiting to start...</div>
-        <div style="font-size: 0.8rem; color: #aaa; text-align: center; margin-top: 10px;">Press 'H' to hide/show UI panel</div>
-        <div style="font-size: 0.85rem; color: #888; text-align: center; margin-top: 25px;">Created by Bunyan<br><a href="https://instagram.com/bongyunng" target="_blank" style="color: #00d2ff; text-decoration: none;">IG: @bongyunng</a></div>
+        <button id="start-btn">Iniciar cámara</button>
+        <button id="toggle-bg-btn">Mostrar/ocultar fondo de cámara</button>
+        <button id="clear-balls">Borrar pelotas</button>
+        <button id="reset-settings-btn">Restablecer configuración</button>
+        <div class="status" id="status-msg">Esperando para iniciar...</div>
+        <div style="font-size: 0.8rem; color: #aaa; text-align: center; margin-top: 10px;">T: iniciar · R: reiniciar · H: ocultar/mostrar panel</div>
+        <div style="font-size: 0.85rem; color: #888; text-align: center; margin-top: 25px;">Creado por Bunyan<br><a href="https://instagram.com/bongyunng" target="_blank" style="color: #00d2ff; text-decoration: none;">IG: @bongyunng</a></div>
     </div>
     
     <div id="video-bg-container">
@@ -108,6 +146,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
-    <script src="app.js?v=2.0"></script>
+    <script src="app.js?v=2.8"></script>
 </body>
 </html>
